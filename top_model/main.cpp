@@ -24,17 +24,20 @@
 #include <cadmium/io/iestream.hpp>
 
 
+#include <cadmium/embedded/fusion/majorityVote.hpp>
 #include <cadmium/embedded/io/digitalInput.hpp>
 #include <cadmium/embedded/io/digitalOutput.hpp>
-
-#include "../atomics/blinky.hpp"
 
 #ifdef ECADMIUM
   #include "../mbed.h"
 #else
   // When simulating the model it will use these files as IO in place of the pins specified.
-  const char* BUTTON1 = "./inputs/BUTTON1_In.txt";
-  const char* LED1    = "./outputs/LED1_Out.txt";
+  const char* A0   = "./inputs/A0_RR_IR_In.txt";
+  const char* A1   = "./inputs/A1_CR_IR_In.txt";
+  const char* A2   = "./inputs/A2_CC_IR_In.txt";
+  const char* A3   = "./inputs/A3_CL_IR_In.txt";
+  const char* D4   = "./inputs/D4_LL_IR_In.txt";
+  const char* D11 = "./outputs/D11_Out.txt";
 #endif
 
 using namespace std;
@@ -56,7 +59,7 @@ int main(int argc, char ** argv) {
     // all simulation timing and I/O streams are ommited when running embedded
     auto start = hclock::now(); //to measure simulation execution time
 
-    static std::ofstream out_data("blinky_test_output.txt");
+    static std::ofstream out_data("maj_vote_output.txt");
     struct oss_sink_provider{
       static std::ostream& sink(){
         return out_data;
@@ -83,33 +86,44 @@ int main(int argc, char ** argv) {
   using CoupledModelPtr=std::shared_ptr<cadmium::dynamic::modeling::coupled<TIME>>;
 
   /********************************************/
-  /***************** blinky *******************/
+  /*********** MajorityVote *******************/
   /********************************************/
 
-  AtomicModelPtr blinky1 = cadmium::dynamic::translate::make_dynamic_atomic_model<Blinky, TIME>("blinky1");
+  AtomicModelPtr majVote = cadmium::dynamic::translate::make_dynamic_atomic_model<MajorityVote, TIME>("majVote", 5);
 
   /********************************************/
   /********** DigitalInput1 *******************/
   /********************************************/
-  AtomicModelPtr digitalInput1 = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("digitalInput1", BUTTON1);
+  AtomicModelPtr rrIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("rrIR", A0);
+  AtomicModelPtr rcIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("rcIR", A1);
+  AtomicModelPtr ccIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("ccIR", A2);
+  AtomicModelPtr lcIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("lcIR", A3);
+  AtomicModelPtr llIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("llIR", D4);
 
   /********************************************/
   /********* DigitalOutput1 *******************/
   /********************************************/
-  AtomicModelPtr digitalOutput1 = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalOutput, TIME>("digitalOutput1", LED1);
+  AtomicModelPtr ledOut = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalOutput, TIME>("ledOut", D11);
 
 
   /************************/
   /*******TOP MODEL********/
   /************************/
+  //No external ports since this model is designed for the embedded platform
   cadmium::dynamic::modeling::Ports iports_TOP = {};
   cadmium::dynamic::modeling::Ports oports_TOP = {};
-  cadmium::dynamic::modeling::Models submodels_TOP =  {blinky1, digitalOutput1, digitalInput1};
   cadmium::dynamic::modeling::EICs eics_TOP = {};
   cadmium::dynamic::modeling::EOCs eocs_TOP = {};
+  cadmium::dynamic::modeling::Models submodels_TOP =  {majVote, rrIR, rcIR, ccIR, lcIR, llIR, ledOut};
   cadmium::dynamic::modeling::ICs ics_TOP = {
-    cadmium::dynamic::translate::make_IC<blinky_defs::dataOut, digitalOutput_defs::in>("blinky1","digitalOutput1"),
-    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, blinky_defs::in>("digitalInput1", "blinky1")
+    // Majority vote's output will controll the LED
+    cadmium::dynamic::translate::make_IC<majorityVote_defs::out, digitalOutput_defs::in>("majVote","ledOut"),
+    // All the IR inputs will be fed into majority vote
+    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in1>("rrIR", "majVote"),
+    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in2>("rcIR", "majVote"),
+    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in3>("ccIR", "majVote"),
+    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in4>("lcIR", "majVote"),
+    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in5>("llIR", "majVote")
   };
   CoupledModelPtr TOP = std::make_shared<cadmium::dynamic::modeling::coupled<TIME>>(
     "TOP",
@@ -122,9 +136,17 @@ int main(int argc, char ** argv) {
   );
 
   ///****************////
-  cadmium::dynamic::engine::runner<NDTime, logger_top> r(TOP, {0});
-  r.run_until(NDTime("00:10:00:000"));
-  #ifndef ECADMIUM
+  #ifdef ECADMIUM
+    DigitalOut rightMotorEn(D9);
+    DigitalOut rightMotor1(D8);
+    rightMotorEn = 1;
+    rightMotor1 = 0;
+    //cadmium::dynamic::engine::runner<NDTime, logger_top> r(TOP, {0});
+    cadmium::dynamic::engine::runner<NDTime, cadmium::logger::not_logger> r(TOP, {0});
+    r.run_until(NDTime("00:10:00:000"));
+  #else
+    cadmium::dynamic::engine::runner<NDTime, logger_top> r(TOP, {0});
+    r.run_until(NDTime("00:10:00:000"));
     return 0;
   #endif
 }
