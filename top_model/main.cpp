@@ -24,19 +24,16 @@
 #include <cadmium/io/iestream.hpp>
 
 
-#include <cadmium/embedded/fusion/majorityVote.hpp>
-#include <cadmium/embedded/io/digitalInput.hpp>
-#include <cadmium/embedded/io/digitalOutput.hpp>
+#include <cadmium/embedded/fusion/averageInput.hpp>
+#include <cadmium/embedded/io/analogInput.hpp>
+#include <cadmium/embedded/io/pwmOutput.hpp>
 
 #ifdef ECADMIUM
   #include "../mbed.h"
 #else
   // When simulating the model it will use these files as IO in place of the pins specified.
-  const char* A0   = "./inputs/A0_RR_IR_In.txt";
-  const char* A1   = "./inputs/A1_CR_IR_In.txt";
-  const char* A2   = "./inputs/A2_CC_IR_In.txt";
-  const char* A3   = "./inputs/A3_CL_IR_In.txt";
-  const char* D4   = "./inputs/D4_LL_IR_In.txt";
+  const char* A4   = "./inputs/A4_In.txt";
+  const char* A5   = "./inputs/A5_In.txt";
   const char* D11 = "./outputs/D11_Out.txt";
 #endif
 
@@ -59,7 +56,7 @@ int main(int argc, char ** argv) {
     // all simulation timing and I/O streams are ommited when running embedded
     auto start = hclock::now(); //to measure simulation execution time
 
-    static std::ofstream out_data("maj_vote_output.txt");
+    static std::ofstream out_data("avg_in_output.txt");
     struct oss_sink_provider{
       static std::ostream& sink(){
         return out_data;
@@ -89,21 +86,18 @@ int main(int argc, char ** argv) {
   /*********** MajorityVote *******************/
   /********************************************/
 
-  AtomicModelPtr majVote = cadmium::dynamic::translate::make_dynamic_atomic_model<MajorityVote, TIME>("majVote", 5);
+  AtomicModelPtr avg = cadmium::dynamic::translate::make_dynamic_atomic_model<AverageInput, TIME>("avg", 2);
 
   /********************************************/
   /********** DigitalInput1 *******************/
   /********************************************/
-  AtomicModelPtr rrIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("rrIR", A0);
-  AtomicModelPtr rcIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("rcIR", A1);
-  AtomicModelPtr ccIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("ccIR", A2);
-  AtomicModelPtr lcIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("lcIR", A3);
-  AtomicModelPtr llIR = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalInput, TIME>("llIR", D4);
+  AtomicModelPtr A4_in = cadmium::dynamic::translate::make_dynamic_atomic_model<AnalogInput, TIME>("A4", A4);
+  AtomicModelPtr A5_in = cadmium::dynamic::translate::make_dynamic_atomic_model<AnalogInput, TIME>("A5", A5);
 
   /********************************************/
   /********* DigitalOutput1 *******************/
   /********************************************/
-  AtomicModelPtr ledOut = cadmium::dynamic::translate::make_dynamic_atomic_model<DigitalOutput, TIME>("ledOut", D11);
+  AtomicModelPtr pwmOut = cadmium::dynamic::translate::make_dynamic_atomic_model<PwmOutput, TIME>("pwmOut", D11);
 
 
   /************************/
@@ -114,16 +108,13 @@ int main(int argc, char ** argv) {
   cadmium::dynamic::modeling::Ports oports_TOP = {};
   cadmium::dynamic::modeling::EICs eics_TOP = {};
   cadmium::dynamic::modeling::EOCs eocs_TOP = {};
-  cadmium::dynamic::modeling::Models submodels_TOP =  {majVote, rrIR, rcIR, ccIR, lcIR, llIR, ledOut};
+  cadmium::dynamic::modeling::Models submodels_TOP =  {avg, A4_in, A5_in, pwmOut};
   cadmium::dynamic::modeling::ICs ics_TOP = {
-    // Majority vote's output will controll the LED
-    cadmium::dynamic::translate::make_IC<majorityVote_defs::out, digitalOutput_defs::in>("majVote","ledOut"),
-    // All the IR inputs will be fed into majority vote
-    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in1>("rrIR", "majVote"),
-    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in2>("rcIR", "majVote"),
-    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in3>("ccIR", "majVote"),
-    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in4>("lcIR", "majVote"),
-    cadmium::dynamic::translate::make_IC<digitalInput_defs::out, majorityVote_defs::in5>("llIR", "majVote")
+    // Majority vote's output will controll the output
+    cadmium::dynamic::translate::make_IC<averageInput_defs::out, pwmOutput_defs::in>("avg","pwmOut"),
+    // All the analog inputs will be fed into the averager
+    cadmium::dynamic::translate::make_IC<analogInput_defs::out, averageInput_defs::in1>("A4", "avg"),
+    cadmium::dynamic::translate::make_IC<analogInput_defs::out, averageInput_defs::in2>("A5", "avg")
   };
   CoupledModelPtr TOP = std::make_shared<cadmium::dynamic::modeling::coupled<TIME>>(
     "TOP",
