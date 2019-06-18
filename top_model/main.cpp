@@ -28,7 +28,7 @@
 #include <cadmium/real_time/arm_mbed/io/analogInput.hpp>
 #include <cadmium/real_time/arm_mbed/io/pwmOutput.hpp>
 
-#ifdef ECADMIUM
+#ifdef RT_ARM_MBED
   #include "../mbed.h"
 #else
   // When simulating the model it will use these files as IO in place of the pins specified.
@@ -45,8 +45,8 @@ using TIME = NDTime;
 
 int main(int argc, char ** argv) {
 
-  #ifdef ECADMIUM
-      //Logging is done over cout in ECADMIUM
+  #ifdef RT_ARM_MBED
+      //Logging is done over cout in RT_ARM_MBED
       struct oss_sink_provider{
         static std::ostream& sink(){
           return cout;
@@ -127,7 +127,7 @@ int main(int argc, char ** argv) {
   );
 
   ///****************////
-  #ifdef ECADMIUM
+  #ifdef RT_ARM_MBED
     DigitalOut rightMotorEn(D9);
     DigitalOut rightMotor1(D8);
     rightMotorEn = 1;
