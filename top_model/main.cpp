@@ -24,9 +24,9 @@
 #include <cadmium/io/iestream.hpp>
 
 
-#include <cadmium/embedded/fusion/averageInput.hpp>
-#include <cadmium/embedded/io/analogInput.hpp>
-#include <cadmium/embedded/io/pwmOutput.hpp>
+#include <cadmium/real_time/arm_mbed/fusion/averageInput.hpp>
+#include <cadmium/real_time/arm_mbed/io/analogInput.hpp>
+#include <cadmium/real_time/arm_mbed/io/pwmOutput.hpp>
 
 #ifdef ECADMIUM
   #include "../mbed.h"
@@ -132,8 +132,8 @@ int main(int argc, char ** argv) {
     DigitalOut rightMotor1(D8);
     rightMotorEn = 1;
     rightMotor1 = 0;
-    //cadmium::dynamic::engine::runner<NDTime, logger_top> r(TOP, {0});
-    cadmium::dynamic::engine::runner<NDTime, cadmium::logger::not_logger> r(TOP, {0});
+    cadmium::dynamic::engine::runner<NDTime, logger_top> r(TOP, {0});
+    //cadmium::dynamic::engine::runner<NDTime, cadmium::logger::not_logger> r(TOP, {0});
     r.run_until(NDTime("00:10:00:000"));
   #else
     cadmium::dynamic::engine::runner<NDTime, logger_top> r(TOP, {0});
